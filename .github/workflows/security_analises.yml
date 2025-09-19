@@ -9,7 +9,7 @@ on:
     - cron: '36 22 * * 6'
 
 jobs:
-  # TAREFA 1: SAST (Análise Estática do Código)
+  # TAREFA 1: SAST com CodeQL
   sast_scan:
     name: Analyze (CodeQL SAST)
     runs-on: ubuntu-latest
@@ -40,11 +40,11 @@ jobs:
       with:
         category: "/language:${{matrix.language}}"
 
-  # TAREFA 2: DAST (Análise Dinâmica da Aplicação)
+  # TAREFA 2: DAST com OWASP ZAP
   dast_scan:
     name: Scan with OWASP ZAP (DAST)
     runs-on: ubuntu-latest
-    # Garante que o DAST só rode após a conclusão do SAST
+    # Garante que o DAST só rode após o SAST
     needs: sast_scan
     steps:
       - name: Checkout code
@@ -53,29 +53,25 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18' # Versão do Node.js recomendada para Expo
-
+          node-version: '18'
+      
       - name: Install dependencies
         run: npm install
 
-      - name: Run Expo app for web in background
+      - name: Run API in background
         run: |
-          # Inicia o servidor de desenvolvimento do Expo para a web em segundo plano
           npx expo start --web &
-          # Espera um tempo para o servidor iniciar completamente
           sleep 60
 
       - name: ZAP Scan
         uses: zaproxy/action-baseline@v0.10.0
         with:
-          # O ZAP tentará escanear o servidor de desenvolvimento do Expo
           target: 'http://localhost:8081'
           # A ação irá gerar o arquivo 'report_html.html', mas não fará o upload
 
       - name: Upload ZAP Report
-        # Este passo sempre será executado, mesmo que o passo anterior falhe
-        if: always()
+        if: always() # Garante que o relatório seja carregado mesmo que o ZAP encontre vulnerabilidades
         uses: actions/upload-artifact@v4
         with:
-          name: zap-scan-report
-          path: report_html.html
+          name: zap-scan-report # Nome do artefato
+          path: report_html.html # Arquivo a ser carregado
